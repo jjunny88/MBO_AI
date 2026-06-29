@@ -114,6 +114,14 @@
   .narr{margin-top:18px;font-size:13.5px;line-height:1.75;color:#C8D6EC;white-space:pre-wrap}
   .narr h3{font-size:13.5px;font-weight:800;color:#fff;margin:15px 0 5px}
   .narr h3:first-child{margin-top:0}
+  .followups{margin-top:18px;padding-top:15px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:13px}
+  .fgroup{display:flex;flex-wrap:wrap;gap:8px}
+  .fgroup .fhint{width:100%;font-size:11px;font-weight:700;color:var(--blue-br);margin-bottom:2px;letter-spacing:.02em}
+  .fgroup .fhint.rec{color:#2DD4BF}
+  .fchip{font-size:12.5px;font-weight:600;color:var(--blue-br);background:rgba(91,168,255,.08);border:1px solid rgba(91,168,255,.28);padding:8px 13px;border-radius:20px;cursor:pointer;transition:.15s;text-align:left}
+  .fchip:hover{background:rgba(91,168,255,.2);border-color:var(--blue-br)}
+  .fchip.rec{color:#2DD4BF;background:rgba(45,212,191,.08);border-color:rgba(45,212,191,.28)}
+  .fchip.rec:hover{background:rgba(45,212,191,.2);border-color:#2DD4BF}
   .narr strong{color:#fff;font-weight:700}
   .narr .k{color:var(--blue-br);font-weight:700}
 
@@ -275,7 +283,14 @@ function elDonut(b){let acc=0;const stops=(b.parts||[]).map(p=>{const a=acc,c=ac
 function elHbars(b){const segs=b.segs||[];return '<div class="hbars">'+(b.rows||[]).map(r=>{const bar=segs.map(s=>{const v=(r.vals&&r.vals[s])||0;return `<div class="seg" style="width:${v}%;background:${COL[s]}">${v>=12?v+'%':''}</div>`;}).join('');return `<div class="hb"><div class="nm" title="${esc(r.name)}">${esc(r.name)}</div><div class="tr">${bar}</div><div class="tot">${r.tot!=null?r.tot:''}</div></div>`;}).join('')+'</div>';}
 function elRank(b){const rows=b.rows||[];const mx=Math.max(1,...rows.map(r=>+r.val||0));const suf=b.suffix||'%';return '<div class="rank">'+rows.map((r,i)=>`<div class="rk"><div class="ix">${i+1}</div><div class="nm" title="${esc(r.name)}">${esc(r.name)}</div><div class="tr"><i data-w="${((+r.val||0)/mx*100).toFixed(1)}"></i></div><div class="vl">${r.val}${suf}</div></div>`).join('')+'</div>';}
 
-function render(card,obj){let h='';if(obj.headline)h+='<div class="hl">'+esc(obj.headline)+'</div>';if(obj.subline)h+='<div class="sl">'+esc(obj.subline)+'</div>';(obj.blocks||[]).forEach(b=>{if(b.type==='progress')h+=elProgress(b.items||[]);else if(b.type==='kpi')h+=elKpi(b.items||[]);else if(b.type==='donut')h+=elDonut(b);else if(b.type==='hbars')h+=elHbars(b);else if(b.type==='rank')h+=elRank(b);});if(obj.narrative)h+='<div class="narr">'+rich(obj.narrative)+'</div>';card.innerHTML=h;card.querySelectorAll('.gbar i,.rk .tr i').forEach(i=>requestAnimationFrame(()=>setTimeout(()=>i.style.width=(i.dataset.w||0)+'%',60)));stream.scrollTop=stream.scrollHeight;}
+function render(card,obj){let h='';if(obj.headline)h+='<div class="hl">'+esc(obj.headline)+'</div>';if(obj.subline)h+='<div class="sl">'+esc(obj.subline)+'</div>';(obj.blocks||[]).forEach(b=>{if(b.type==='progress')h+=elProgress(b.items||[]);else if(b.type==='kpi')h+=elKpi(b.items||[]);else if(b.type==='donut')h+=elDonut(b);else if(b.type==='hbars')h+=elHbars(b);else if(b.type==='rank')h+=elRank(b);});if(obj.narrative)h+='<div class="narr">'+rich(obj.narrative)+'</div>';
+  const rel=Array.isArray(obj.related)?obj.related.slice(0,3):[];const rec=Array.isArray(obj.recommended)?obj.recommended.slice(0,2):[];
+  if(rel.length||rec.length){h+='<div class="followups">';
+    if(rel.length){h+='<div class="fgroup"><div class="fhint">🔍 연관 질문</div>'+rel.map(x=>'<button class="fchip">'+esc(x)+'</button>').join('')+'</div>';}
+    if(rec.length){h+='<div class="fgroup"><div class="fhint rec">💡 추천 질문</div>'+rec.map(x=>'<button class="fchip rec">'+esc(x)+'</button>').join('')+'</div>';}
+    h+='</div>';}
+  card.innerHTML=h;
+  card.querySelectorAll('.fchip').forEach(b=>b.addEventListener('click',()=>{if(!busy)ask(b.textContent);}));card.querySelectorAll('.gbar i,.rk .tr i').forEach(i=>requestAnimationFrame(()=>setTimeout(()=>i.style.width=(i.dataset.w||0)+'%',60)));stream.scrollTop=stream.scrollHeight;}
 
 /* ===== helpers ===== */
 const pctNum=v=>(typeof v==='number'?(v<=1?Math.round(v*100):Math.round(v)):0);
@@ -292,7 +307,7 @@ function team_overview(){
   const rows=PPL.map(p=>({name:p.name,val:pAvg(p),score:p.y2025.인사평가.종합점수})).sort((a,b)=>b.val-a.val);
   const avg=Math.round(rows.reduce((s,r)=>s+r.val,0)/rows.length);
   const low=rows[rows.length-1];
-  return{headline:`인사팀 평균 진척률 ${avg}% · 팀원 ${rows.length}명`,
+  return{kind:"team_overview",headline:`인사팀 평균 진척률 ${avg}% · 팀원 ${rows.length}명`,
     subline:`26년 중간점검 기준, 팀원별 가중 평균 진척률입니다.`,
     blocks:[{type:'rank',rows:rows.map(r=>({name:r.name,val:r.val}))}],
     narrative:`### 짚을 점\n**${rows[0].name}**이 [[${rows[0].val}%]]로 가장 앞서고, **${low.name}**이 [[${low.val}%]]로 가장 더뎌요.\n\n### 다음 할 일\n진척이 낮은 팀원은 1:1로 막힌 지점을 점검하세요. "${low.name} 진척" 처럼 개인별로 더 파볼 수 있어요.`};
@@ -300,26 +315,26 @@ function team_overview(){
 function team_stall(){
   const rows=PPL.map(p=>({name:p.name,val:pAvg(p)})).sort((a,b)=>a.val-b.val);
   const low=PPL.find(p=>p.name===rows[0].name);
-  return{headline:`가장 정체된 팀원: ${rows[0].name} (${rows[0].val}%)`,
+  return{kind:"team_stall",headline:`가장 정체된 팀원: ${rows[0].name} (${rows[0].val}%)`,
     subline:`팀원 ${PPL.length}명 중 평균 진척률이 가장 낮습니다.`,
     blocks:[{type:'progress',items:pCards(low)}],
     narrative:`### 짚을 점\n**${rows[0].name}**의 목표 중 비중 큰 과제가 더뎌 평균을 끌어내리고 있어요.\n\n### 다음 할 일\n해당 팀원과 우선순위·일정을 재점검하세요.`};
 }
 
 /* ===== 개인 ===== */
-function p_progress(P){const cs=pCards(P);const avg=pAvg(P);const low=[...cs].sort((a,b)=>a.pct-b.pct)[0];return{headline:`${P.name} 26년 목표 가중 평균 진척률 ${avg}%`,subline:`26년 중간점검 기준, 등록 목표 ${cs.length}개로 계산했어요.`,blocks:[{type:'progress',items:cs}],narrative:`### 짚을 점\n가중치 [[${low.w}%]]로 비중이 가장 큰 **${low.title}**이 [[${low.pct}%]]로 가장 더뎌요.\n\n### 다음 할 일\n비중 큰 목표부터 남은 기간 자원을 집중하세요.`};}
-function p_review(P){const r=P.y2025.인사평가;return{headline:`${P.name} 25년 인사평가 종합 ${r.종합점수}점`,subline:`1차 평가자 ${r['1차평가자']}`,blocks:[{type:'kpi',items:[{k:'종합 점수',v:r.종합점수,unit:'점'},{k:'평가자',v:r['1차평가자']}]}],narrative:`### 평가 의견\n**강점** ${r.평가의견.업적_강점}\n\n**개선** ${r.평가의견.업적_개선}\n\n### 발전 방향\n${r.평가의견.업적_발전계획}`};}
-function p_feedback(P){const o=P.y2025.인사평가.평가의견;return{headline:`${P.name} · 강점과 개선점`,subline:`25년 인사평가 평가자 의견 기준입니다.`,blocks:[],narrative:`### 강점\n${o.업적_강점}\n\n### 개선점\n${o.업적_개선}\n\n### 발전 방향\n${o.업적_발전계획}`};}
+function p_progress(P){const cs=pCards(P);const avg=pAvg(P);const low=[...cs].sort((a,b)=>a.pct-b.pct)[0];return{kind:"p_progress",headline:`${P.name} 26년 목표 가중 평균 진척률 ${avg}%`,subline:`26년 중간점검 기준, 등록 목표 ${cs.length}개로 계산했어요.`,blocks:[{type:'progress',items:cs}],narrative:`### 짚을 점\n가중치 [[${low.w}%]]로 비중이 가장 큰 **${low.title}**이 [[${low.pct}%]]로 가장 더뎌요.\n\n### 다음 할 일\n비중 큰 목표부터 남은 기간 자원을 집중하세요.`};}
+function p_review(P){const r=P.y2025.인사평가;return{kind:"p_review",headline:`${P.name} 25년 인사평가 종합 ${r.종합점수}점`,subline:`1차 평가자 ${r['1차평가자']}`,blocks:[{type:'kpi',items:[{k:'종합 점수',v:r.종합점수,unit:'점'},{k:'평가자',v:r['1차평가자']}]}],narrative:`### 평가 의견\n**강점** ${r.평가의견.업적_강점}\n\n**개선** ${r.평가의견.업적_개선}\n\n### 발전 방향\n${r.평가의견.업적_발전계획}`};}
+function p_feedback(P){const o=P.y2025.인사평가.평가의견;return{kind:"p_feedback",headline:`${P.name} · 강점과 개선점`,subline:`25년 인사평가 평가자 의견 기준입니다.`,blocks:[],narrative:`### 강점\n${o.업적_강점}\n\n### 개선점\n${o.업적_개선}\n\n### 발전 방향\n${o.업적_발전계획}`};}
 
 /* ===== 전사 ===== */
-function o_qq(){const rows=[...U].sort((a,b)=>b.정량비율-a.정량비율).map(u=>({name:u.name,vals:{정량:u.정량비율,정성:u.정성비율},tot:u.총건수}));const top=rows[0],low=rows[rows.length-1];return{headline:`전사 정량 ${T.정량비율}% · 정성 ${T.정성비율}%`,subline:`9개 본부 26년 MBO 지표 ${T.총건수.toLocaleString()}건 기준.`,blocks:[{type:'donut',centerB:T.정량비율+'%',centerS:'정량',parts:[{name:'정량',val:T.정량비율,cnt:T.정량,color:COL.정량},{name:'정성',val:T.정성비율,cnt:T.정성,color:COL.정성}]},{type:'hbars',segs:['정량','정성'],rows}],narrative:`### 짚을 점\n**${top.name}**이 정량 [[${top.vals.정량}%]]로 최고, **${low.name}**이 [[${low.vals.정량}%]]로 최저예요.\n\n### 다음 할 일\n정성 비중 높은 본부는 27년 정량 전환 후보로 검토하세요.`};}
-function o_work(){const rows=U.map(u=>({name:u.name,vals:{기본:u.기본비율,중점:u.중점비율,개선:u.개선비율},tot:u.기본+u.중점+u.개선}));return{headline:`전사 업무구분 — 기본 ${T.기본비율}% · 중점 ${T.중점비율}% · 개선 ${T.개선비율}%`,subline:`전체 ${T.업무합계.toLocaleString()}건 업무 성격 분포.`,blocks:[{type:'donut',centerB:T.기본비율+'%',centerS:'기본',parts:[{name:'기본',val:T.기본비율,cnt:T.기본,color:COL.기본},{name:'중점',val:T.중점비율,cnt:T.중점,color:COL.중점},{name:'개선',val:T.개선비율,cnt:T.개선,color:COL.개선}]},{type:'hbars',segs:['기본','중점','개선'],rows}],narrative:`### 짚을 점\n**기본 업무**가 [[${T.기본비율}%]]로 가장 큰 비중, 개선은 [[${T.개선비율}%]].\n\n### 다음 할 일\n개선 비중 낮은 본부는 목표에 개선 과제를 더 끌어올릴 여지가 있어요.`};}
-function o_rank(key,label){const rows=[...U].sort((a,b)=>b[key]-a[key]).map(u=>({name:u.name,val:u[key]}));return{headline:`${label} 순위`,subline:`9개 본부를 ${label} 기준 정렬.`,blocks:[{type:'rank',rows}],narrative:`### 짚을 점\n1위 **${rows[0].name}** [[${rows[0].val}%]], 최하위 **${rows[rows.length-1].name}** [[${rows[rows.length-1].val}%]].`};}
-function o_summary(){return{headline:`전사 26년 MBO 현황 요약`,subline:`9개 본부 집계 핵심 지표.`,blocks:[{type:'kpi',items:[{k:'분석 본부',v:T.본부수,unit:'개'},{k:'총 지표',v:T.총건수.toLocaleString(),unit:'건'},{k:'정량 비율',v:T.정량비율,unit:'%'},{k:'개선 업무',v:T.개선비율,unit:'%'}]},{type:'donut',centerB:T.정량비율+'%',centerS:'정량',parts:[{name:'정량',val:T.정량비율,cnt:T.정량,color:COL.정량},{name:'정성',val:T.정성비율,cnt:T.정성,color:COL.정성}]}],narrative:`### 한눈에\n전사 지표는 정량 [[${T.정량비율}%]] / 정성 [[${T.정성비율}%]]로 정량 우세, 업무는 기본 [[${T.기본비율}%]] 중심.\n\n### 다음 할 일\n"정량비율 순위", "업무구분 분포"로 더 깊이 파보세요.`};}
+function o_qq(){const rows=[...U].sort((a,b)=>b.정량비율-a.정량비율).map(u=>({name:u.name,vals:{정량:u.정량비율,정성:u.정성비율},tot:u.총건수}));const top=rows[0],low=rows[rows.length-1];return{kind:"o_qq",headline:`전사 정량 ${T.정량비율}% · 정성 ${T.정성비율}%`,subline:`9개 본부 26년 MBO 지표 ${T.총건수.toLocaleString()}건 기준.`,blocks:[{type:'donut',centerB:T.정량비율+'%',centerS:'정량',parts:[{name:'정량',val:T.정량비율,cnt:T.정량,color:COL.정량},{name:'정성',val:T.정성비율,cnt:T.정성,color:COL.정성}]},{type:'hbars',segs:['정량','정성'],rows}],narrative:`### 짚을 점\n**${top.name}**이 정량 [[${top.vals.정량}%]]로 최고, **${low.name}**이 [[${low.vals.정량}%]]로 최저예요.\n\n### 다음 할 일\n정성 비중 높은 본부는 27년 정량 전환 후보로 검토하세요.`};}
+function o_work(){const rows=U.map(u=>({name:u.name,vals:{기본:u.기본비율,중점:u.중점비율,개선:u.개선비율},tot:u.기본+u.중점+u.개선}));return{kind:"o_work",headline:`전사 업무구분 — 기본 ${T.기본비율}% · 중점 ${T.중점비율}% · 개선 ${T.개선비율}%`,subline:`전체 ${T.업무합계.toLocaleString()}건 업무 성격 분포.`,blocks:[{type:'donut',centerB:T.기본비율+'%',centerS:'기본',parts:[{name:'기본',val:T.기본비율,cnt:T.기본,color:COL.기본},{name:'중점',val:T.중점비율,cnt:T.중점,color:COL.중점},{name:'개선',val:T.개선비율,cnt:T.개선,color:COL.개선}]},{type:'hbars',segs:['기본','중점','개선'],rows}],narrative:`### 짚을 점\n**기본 업무**가 [[${T.기본비율}%]]로 가장 큰 비중, 개선은 [[${T.개선비율}%]].\n\n### 다음 할 일\n개선 비중 낮은 본부는 목표에 개선 과제를 더 끌어올릴 여지가 있어요.`};}
+function o_rank(key,label){const rows=[...U].sort((a,b)=>b[key]-a[key]).map(u=>({name:u.name,val:u[key]}));return{kind:"o_rank",headline:`${label} 순위`,subline:`9개 본부를 ${label} 기준 정렬.`,blocks:[{type:'rank',rows}],narrative:`### 짚을 점\n1위 **${rows[0].name}** [[${rows[0].val}%]], 최하위 **${rows[rows.length-1].name}** [[${rows[rows.length-1].val}%]].`};}
+function o_summary(){return{kind:"o_summary",headline:`전사 26년 MBO 현황 요약`,subline:`9개 본부 집계 핵심 지표.`,blocks:[{type:'kpi',items:[{k:'분석 본부',v:T.본부수,unit:'개'},{k:'총 지표',v:T.총건수.toLocaleString(),unit:'건'},{k:'정량 비율',v:T.정량비율,unit:'%'},{k:'개선 업무',v:T.개선비율,unit:'%'}]},{type:'donut',centerB:T.정량비율+'%',centerS:'정량',parts:[{name:'정량',val:T.정량비율,cnt:T.정량,color:COL.정량},{name:'정성',val:T.정성비율,cnt:T.정성,color:COL.정성}]}],narrative:`### 한눈에\n전사 지표는 정량 [[${T.정량비율}%]] / 정성 [[${T.정성비율}%]]로 정량 우세, 업무는 기본 [[${T.기본비율}%]] 중심.\n\n### 다음 할 일\n"정량비율 순위", "업무구분 분포"로 더 깊이 파보세요.`};}
 
 function help(){return{headline:`이렇게 물어보세요`,subline:`개인·팀·전사를 모두 분석합니다.`,blocks:[],narrative:`### 개인\n- "김도윤 목표 진척", "이서연 인사평가 결과", "박지호 강점·개선점"\n\n### 팀\n- "팀원별 진척 현황", "가장 정체된 팀원은?"\n\n### 전사\n- "본부별 정량·정성 비교", "업무구분 분포", "정량비율 순위", "전사 요약"`};}
 
-function route(q){const t=q.replace(/\s/g,'');
+function routeInner(q){const t=q.replace(/\s/g,'');
   const orgSig=/(전사|전체|본부|9개|부서별|정량비율|정성비율|업무구분|지표수)/.test(t);
   if(orgSig){
     const isRank=/(순위|랭킹|높은|낮은|가장|top|순서)/i.test(t);
@@ -341,6 +356,25 @@ function route(q){const t=q.replace(/\s/g,'');
   if(/(진척|현황|목표|상황|성과)/.test(t))return team_overview();
   return help();
 }
+
+function attachChips(obj,q){
+  const who=findPerson(q); const nm=who?who.name:'';
+  const C={
+    team_overview:{r:['가장 정체된 팀원은?','김도윤 목표 진척','이서연 인사평가 결과'],x:['본부별 정량·정성 비교','전사 업무구분 분포']},
+    team_stall:{r:['팀원별 진척 현황','정민재 목표 진척','박지호 강점·개선점'],x:['정량비율 순위','전사 요약']},
+    p_progress:{r:[nm+' 인사평가 결과',nm+' 강점·개선점','팀원별 진척 현황'],x:['본부별 정량·정성 비교','전사 요약']},
+    p_review:{r:[nm+' 강점·개선점',nm+' 목표 진척','팀원별 진척 현황'],x:['전사 요약','전사 업무구분 분포']},
+    p_feedback:{r:[nm+' 목표 진척',nm+' 인사평가 결과','가장 정체된 팀원은?'],x:['본부별 정량·정성 비교','정량비율 순위']},
+    o_qq:{r:['전사 업무구분 분포','정량비율 순위','전사 요약'],x:['팀원별 진척 현황','김도윤 목표 진척']},
+    o_work:{r:['본부별 정량·정성 비교','정량비율 순위','전사 요약'],x:['팀원별 진척 현황','가장 정체된 팀원은?']},
+    o_rank:{r:['전사 업무구분 분포','본부별 정량·정성 비교','전사 요약'],x:['팀원별 진척 현황','김도윤 목표 진척']},
+    o_summary:{r:['본부별 정량·정성 비교','전사 업무구분 분포','정량비율 순위'],x:['팀원별 진척 현황','이서연 인사평가 결과']},
+  };
+  const c=C[obj.kind]; if(c){obj.related=c.r;obj.recommended=c.x;}
+  return obj;
+}
+function route(q){return attachChips(routeInner(q),q);}
+
 function ask(text){text=(text||'').trim();if(!text||busy)return;input.value='';input.style.height='auto';addUser(text);busy=true;sendBtn.disabled=true;const card=addThinking();const obj=route(text);setTimeout(()=>{render(card,obj);busy=false;sendBtn.disabled=false;input.focus();stream.scrollTop=stream.scrollHeight;},460);}
 </script></body>
 </html>
